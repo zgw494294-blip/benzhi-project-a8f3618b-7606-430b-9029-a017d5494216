@@ -6,12 +6,14 @@ import (
 	"encoding/hex"
 	"revisiongate/internal/domain"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Service struct {
 	repo         Repository
 	now          func() time.Time
+	noticeMu     sync.RWMutex
 	noticeLookup map[string]string
 }
 

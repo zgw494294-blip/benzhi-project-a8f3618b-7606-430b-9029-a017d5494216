@@ -92,7 +92,10 @@ func (s *Service) SearchNotices(ctx context.Context, query NoticeQuery) (*Notice
 }
 
 func (s *Service) VerifyEffectivityNotice(ctx context.Context, noticeID, code string) (*NoticeVerificationView, error) {
-	if caseID, ok := s.noticeLookup[noticeID]; ok {
+	s.noticeMu.RLock()
+	caseID, ok := s.noticeLookup[noticeID]
+	s.noticeMu.RUnlock()
+	if ok {
 		c, err := s.Get(ctx, caseID)
 		if err != nil {
 			return nil, err
@@ -104,19 +107,24 @@ func (s *Service) VerifyEffectivityNotice(ctx context.Context, noticeID, code st
 	if err != nil {
 		return nil, err
 	}
+	s.noticeMu.Lock()
+	defer s.noticeMu.Unlock()
+	var matched *domain.RevisionCase
 	for _, c := range cases {
 		if c.Status != domain.StatusEffective || c.Notice == nil {
 			continue
 		}
 		s.noticeLookup[c.Notice.ID] = c.ID
 		s.noticeLookup[c.Notice.SerialNumber] = c.ID
-		if c.Notice.ID != noticeID && c.Notice.SerialNumber != noticeID {
-			continue
+		if matched == nil && (c.Notice.ID == noticeID || c.Notice.SerialNumber == noticeID) {
+			matched = c
 		}
-		verification := domain.VerifyNoticeAt(c, code, s.now())
-		return &NoticeVerificationView{Item: noticeItem(c), Verification: verification, FieldUsable: verification.Matched && verification.Status == domain.NoticeCurrent}, nil
 	}
-	return nil, Translate(ErrNotFound)
+	if matched == nil {
+		return nil, Translate(ErrNotFound)
+	}
+	verification := domain.VerifyNoticeAt(matched, code, s.now())
+	return &NoticeVerificationView{Item: noticeItem(matched), Verification: verification, FieldUsable: verification.Matched && verification.Status == domain.NoticeCurrent}, nil
 }
 
 func noticeItem(c *domain.RevisionCase) NoticeSearchItem {
