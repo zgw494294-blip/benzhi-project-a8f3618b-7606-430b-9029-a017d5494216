@@ -69,6 +69,7 @@ func (c *RevisionCase) UpdateChange(id string, in ChangeInput) error {
 		return ErrNotFound
 	}
 	b := &c.Blocks[index]
+	digestBefore := BlockDigest(*b)
 	b.Chapter = strings.TrimSpace(in.Chapter)
 	b.TaskNumber = strings.TrimSpace(in.TaskNumber)
 	b.SourceLocator = strings.TrimSpace(in.SourceLocator)
@@ -78,6 +79,9 @@ func (c *RevisionCase) UpdateChange(id string, in ChangeInput) error {
 	b.EngineeringReference = strings.TrimSpace(in.EngineeringReference)
 	b.ApprovalReference = strings.TrimSpace(in.ApprovalReference)
 	b.ConfigurationScope = strings.TrimSpace(in.ConfigurationScope)
+	if BlockDigest(*b) != digestBefore {
+		c.invalidateRemediationReviewsForBlock(id)
+	}
 	c.InvalidateChecks()
 	return nil
 }
@@ -97,6 +101,7 @@ func (c *RevisionCase) DeleteChange(id string) error {
 		return ErrNotFound
 	}
 	c.Blocks = append(c.Blocks[:index], c.Blocks[index+1:]...)
+	c.invalidateRemediationReviewsForBlock(id)
 	for i := range c.Rounds {
 		if c.Rounds[i].Index != c.CurrentRevision {
 			continue
@@ -243,4 +248,26 @@ func BlockDigest(b ChangeBlock) string {
 	raw := fmt.Sprintf("%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s", strings.TrimSpace(b.Chapter), strings.TrimSpace(b.TaskNumber), strings.TrimSpace(b.SourceLocator), strings.TrimSpace(b.ReplacementText), strings.TrimSpace(b.WarningText), strings.TrimSpace(b.AffectedProcedure), strings.TrimSpace(b.EngineeringReference), strings.TrimSpace(b.ApprovalReference), strings.TrimSpace(b.ConfigurationScope))
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
+}
+
+// invalidateRemediationReviewsForBlock restores any findings linked to the
+// given change block back to the pending review queue after the block was
+// modified or removed. Without this, an editor can alter a verified
+// remediation block and the affected finding would keep its verified
+// decision and original closed-at timestamp, allowing new content to reach
+// approval without a fresh review.
+func (c *RevisionCase) invalidateRemediationReviewsForBlock(blockID string) {
+	for i := range c.Findings {
+		f := &c.Findings[i]
+		if f.RemediatedBlockID != blockID {
+			continue
+		}
+		if f.ReviewDecision != DecisionVerified && f.ReviewDecision != DecisionRejected {
+			continue
+		}
+		f.ReviewDecision = DecisionOpen
+		f.ReviewedBy = ""
+		f.RejectionReason = ""
+		f.ClosedAt = nil
+	}
 }
