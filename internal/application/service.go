@@ -46,23 +46,24 @@ func (s *Service) CreateCase(ctx context.Context, cmd CreateCaseCommand) (*domai
 	if err != nil {
 		return nil, false, Translate(err)
 	}
-	out, replayed, err := s.repo.Create(ctx, cmd.IdempotencyKey, item, actor(cmd.Actor), "创建临时修订任务")
+	fp := requestFingerprint("case.create", "", "", cmd)
+	out, replayed, err := s.repo.Create(withFingerprint(ctx, fp), cmd.IdempotencyKey, item, actor(cmd.Actor), "创建临时修订任务")
 	if err != nil {
 		return nil, false, Translate(err)
 	}
 	return out, replayed, nil
 }
 func (s *Service) mutate(ctx context.Context, id string, meta Meta, action string, fn Mutation) (*domain.RevisionCase, bool, error) {
-	return s.mutateDetailed(ctx, id, meta, action, "", fn)
+	return s.mutateDetailed(ctx, id, meta, action, "", "", fn)
 }
-func (s *Service) mutateDetailed(ctx context.Context, id string, meta Meta, action, detail string, fn Mutation) (*domain.RevisionCase, bool, error) {
+func (s *Service) mutateDetailed(ctx context.Context, id string, meta Meta, action, detail, fingerprint string, fn Mutation) (*domain.RevisionCase, bool, error) {
 	if err := validateKey(meta.IdempotencyKey); err != nil {
 		return nil, false, Translate(err)
 	}
 	if meta.ExpectedVersion < 1 {
 		return nil, false, Translate(domain.Violation{Field: "expectedVersion", Message: "expectedVersion 必须为正整数"})
 	}
-	out, replayed, err := s.repo.Update(ctx, id, meta.ExpectedVersion, meta.IdempotencyKey, action, actor(meta.Actor), func(c *domain.RevisionCase) error {
+	out, replayed, err := s.repo.Update(withFingerprint(ctx, fingerprint), id, meta.ExpectedVersion, meta.IdempotencyKey, action, actor(meta.Actor), func(c *domain.RevisionCase) error {
 		if err := fn(c); err != nil {
 			return err
 		}

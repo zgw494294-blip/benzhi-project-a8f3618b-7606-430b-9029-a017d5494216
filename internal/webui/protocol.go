@@ -33,6 +33,8 @@ func writeError(w http.ResponseWriter, err error) {
 		status = http.StatusNotFound
 	case "version_conflict":
 		status = http.StatusConflict
+	case "idempotency_conflict":
+		status = http.StatusConflict
 	case "immutable":
 		status = http.StatusConflict
 	case "internal_error":

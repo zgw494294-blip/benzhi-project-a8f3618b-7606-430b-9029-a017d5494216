@@ -16,13 +16,13 @@ func projectionDigest(p projection) string {
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
 }
-func (s *FileStore) commit(key string, item *domain.RevisionCase, audit domain.AuditEvent) error {
+func (s *FileStore) commit(key, action, fingerprint string, item *domain.RevisionCase, audit domain.AuditEvent) error {
 	info, err := s.log.Stat()
 	if err != nil {
 		return err
 	}
 	oldSize := info.Size()
-	idem := idemResult{CaseID: item.ID, Version: item.Version, Result: item}
+	idem := idemResult{CaseID: item.ID, Version: item.Version, Action: action, Fingerprint: fingerprint, Result: item}
 	payload := committedPayload{Case: item, Audit: audit, Idempotency: idem}
 	frame, err := s.appendFrame(key, payload)
 	if err != nil {

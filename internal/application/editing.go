@@ -8,12 +8,12 @@ import (
 )
 
 func (s *Service) AddChange(ctx context.Context, id string, cmd AddChangeCommand) (*domain.RevisionCase, bool, error) {
-	return s.mutate(ctx, id, cmd.Meta, "change.add", func(c *domain.RevisionCase) error {
+	return s.mutateDetailed(ctx, id, cmd.Meta, "change.add", "", requestFingerprint("change.add", versionKey(cmd.Meta.ExpectedVersion), "", cmd), func(c *domain.RevisionCase) error {
 		return c.AddChange(domain.ChangeInput{ID: cmd.ID, Chapter: cmd.Chapter, TaskNumber: cmd.TaskNumber, SourceLocator: cmd.SourceLocator, ReplacementText: cmd.ReplacementText, WarningText: cmd.WarningText, AffectedProcedure: cmd.AffectedProcedure, EngineeringReference: cmd.EngineeringReference, ApprovalReference: cmd.ApprovalReference, ConfigurationScope: cmd.ConfigurationScope})
 	})
 }
 func (s *Service) UpdateChange(ctx context.Context, id, blockID string, cmd UpdateChangeCommand) (*domain.RevisionCase, bool, error) {
-	return s.mutateDetailed(ctx, id, cmd.Meta, "change.update", "修改变更块 "+blockID, func(c *domain.RevisionCase) error {
+	return s.mutateDetailed(ctx, id, cmd.Meta, "change.update", "修改变更块 "+blockID, requestFingerprint("change.update", versionKey(cmd.Meta.ExpectedVersion), blockID, cmd), func(c *domain.RevisionCase) error {
 		if strings.TrimSpace(cmd.ID) != "" && strings.TrimSpace(cmd.ID) != blockID {
 			return domain.Violation{Field: "id", Message: "请求体变更块 ID 与路径不一致"}
 		}
@@ -21,7 +21,7 @@ func (s *Service) UpdateChange(ctx context.Context, id, blockID string, cmd Upda
 	})
 }
 func (s *Service) DeleteChange(ctx context.Context, id, blockID string, cmd DeleteChangeCommand) (*domain.RevisionCase, bool, error) {
-	return s.mutateDetailed(ctx, id, cmd.Meta, "change.delete", "删除变更块 "+blockID, func(c *domain.RevisionCase) error { return c.DeleteChange(blockID) })
+	return s.mutateDetailed(ctx, id, cmd.Meta, "change.delete", "删除变更块 "+blockID, requestFingerprint("change.delete", versionKey(cmd.Meta.ExpectedVersion), blockID, cmd), func(c *domain.RevisionCase) error { return c.DeleteChange(blockID) })
 }
 func (s *Service) ReorderChanges(ctx context.Context, id string, cmd ReorderChangesCommand) (*domain.RevisionCase, bool, error) {
 	targets := append([]string(nil), cmd.BlockIDs...)
@@ -31,7 +31,7 @@ func (s *Service) ReorderChanges(ctx context.Context, id string, cmd ReorderChan
 		}
 	}
 	detail := fmt.Sprintf("重排当前轮 %d 个变更块：%s", len(targets), strings.Join(targets, ","))
-	return s.mutateDetailed(ctx, id, cmd.Meta, "change.reorder", detail, func(c *domain.RevisionCase) error {
+	return s.mutateDetailed(ctx, id, cmd.Meta, "change.reorder", detail, requestFingerprint("change.reorder", versionKey(cmd.Meta.ExpectedVersion), "", cmd), func(c *domain.RevisionCase) error {
 		if (len(cmd.BlockIDs) == 0) == (len(cmd.Order) == 0) {
 			return domain.ErrInvalidOrder
 		}
@@ -55,7 +55,7 @@ func maxLen(left, right int) int {
 	return right
 }
 func (s *Service) Validate(ctx context.Context, id string, meta Meta) (*domain.RevisionCase, bool, error) {
-	return s.mutate(ctx, id, meta, "rules.validate", func(c *domain.RevisionCase) error {
+	return s.mutateDetailed(ctx, id, meta, "rules.validate", "", requestFingerprint("rules.validate", versionKey(meta.ExpectedVersion), "", meta), func(c *domain.RevisionCase) error {
 		if err := c.AssertMutable(); err != nil {
 			return err
 		}
@@ -64,5 +64,5 @@ func (s *Service) Validate(ctx context.Context, id string, meta Meta) (*domain.R
 	})
 }
 func (s *Service) Submit(ctx context.Context, id string, meta Meta) (*domain.RevisionCase, bool, error) {
-	return s.mutate(ctx, id, meta, "review.submit", func(c *domain.RevisionCase) error { return c.SubmitReview(s.now()) })
+	return s.mutateDetailed(ctx, id, meta, "review.submit", "", requestFingerprint("review.submit", versionKey(meta.ExpectedVersion), "", meta), func(c *domain.RevisionCase) error { return c.SubmitReview(s.now()) })
 }

@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrNotFound    = errors.New("case not found")
-	ErrConflict    = errors.New("expected version conflict")
-	ErrIdempotency = errors.New("idempotency key required")
+	ErrNotFound         = errors.New("case not found")
+	ErrConflict         = errors.New("expected version conflict")
+	ErrIdempotency      = errors.New("idempotency key required")
+	ErrIdempotencyReuse = errors.New("idempotency key reused for a different request")
 )
 
 type AppError struct {
@@ -41,6 +42,8 @@ func Translate(err error) *AppError {
 		return &AppError{Code: "version_conflict", Message: "数据已被其他操作更新，请刷新后重试", Cause: err}
 	case errors.Is(err, ErrIdempotency):
 		return &AppError{Code: "idempotency_required", Message: "写请求必须提供 idempotencyKey", Cause: err}
+	case errors.Is(err, ErrIdempotencyReuse):
+		return &AppError{Code: "idempotency_conflict", Message: "幂等键已用于其他操作或不同请求内容，无法重放", Cause: err}
 	case errors.Is(err, domain.ErrFrozen):
 		return &AppError{Code: "immutable", Message: "生效版本已经冻结，不允许修改", Cause: err}
 	case errors.Is(err, domain.ErrDuplicateLocator):

@@ -8,10 +8,14 @@ import (
 	"strings"
 )
 
-func (s *FileStore) Create(_ context.Context, key string, item *domain.RevisionCase, actor, detail string) (*domain.RevisionCase, bool, error) {
+func (s *FileStore) Create(ctx context.Context, key string, item *domain.RevisionCase, actor, detail string) (*domain.RevisionCase, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	fingerprint := application.FingerprintFromContext(ctx)
 	if prior, ok := s.state.Idempotency[key]; ok {
+		if err := prior.expectFingerprint(fingerprint); err != nil {
+			return nil, false, err
+		}
 		return s.replay(prior)
 	}
 	if _, ok := s.state.Cases[item.ID]; ok {
@@ -22,18 +26,22 @@ func (s *FileStore) Create(_ context.Context, key string, item *domain.RevisionC
 		return nil, false, err
 	}
 	audit := domain.AuditEvent{Sequence: s.state.LastSequence + 1, CaseID: item.ID, Action: "case.create", Actor: actor, Version: item.Version, RevisionIndex: item.CurrentRevision, At: item.UpdatedAt, Detail: detail}
-	if err = s.commit(key, copyItem, audit); err != nil {
+	if err = s.commit(key, "case.create", fingerprint, copyItem, audit); err != nil {
 		return nil, false, err
 	}
 	out, _ := cloneCase(copyItem)
 	return out, false, nil
 }
-func (s *FileStore) Update(_ context.Context, id string, expected int64, key, action, actor string, mutate application.Mutation, details ...string) (*domain.RevisionCase, bool, error) {
+func (s *FileStore) Update(ctx context.Context, id string, expected int64, key, action, actor string, mutate application.Mutation, details ...string) (*domain.RevisionCase, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	fingerprint := application.FingerprintFromContext(ctx)
 	if prior, ok := s.state.Idempotency[key]; ok {
 		if prior.CaseID != id {
 			return nil, false, fmt.Errorf("幂等键已用于其他任务")
+		}
+		if err := prior.expectFingerprint(fingerprint); err != nil {
+			return nil, false, err
 		}
 		return s.replay(prior)
 	}
@@ -56,7 +64,7 @@ func (s *FileStore) Update(_ context.Context, id string, expected int64, key, ac
 		detail = strings.TrimSpace(details[0])
 	}
 	audit := domain.AuditEvent{Sequence: s.state.LastSequence + 1, CaseID: id, Action: action, Actor: actor, Version: working.Version, RevisionIndex: working.CurrentRevision, At: working.UpdatedAt, Detail: detail}
-	if err = s.commit(key, working, audit); err != nil {
+	if err = s.commit(key, action, fingerprint, working, audit); err != nil {
 		return nil, false, err
 	}
 	out, _ := cloneCase(working)
