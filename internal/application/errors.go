@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"revisiongate/internal/domain"
@@ -57,6 +58,10 @@ func Translate(err error) *AppError {
 		return &AppError{Code: "batch_not_reviewable", Message: "批次包含不存在、重复或尚不可复核的问题，未应用任何结论", Cause: err}
 	case errors.Is(err, domain.ErrInvalidState):
 		return &AppError{Code: "invalid_state", Message: "当前流程状态不允许此操作", Cause: err}
+	case errors.Is(err, context.Canceled):
+		return &AppError{Code: "request_canceled", Message: "请求已被取消", Cause: err}
+	case errors.Is(err, context.DeadlineExceeded):
+		return &AppError{Code: "request_timeout", Message: "请求超时", Cause: err}
 	default:
 		return &AppError{Code: "internal_error", Message: fmt.Sprintf("操作失败：%v", err), Cause: err}
 	}

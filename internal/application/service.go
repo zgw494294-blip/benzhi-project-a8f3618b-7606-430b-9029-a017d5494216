@@ -80,16 +80,20 @@ func (s *Service) mutateDetailed(ctx context.Context, id string, meta Meta, acti
 	return out, replayed, nil
 }
 func (s *Service) Get(ctx context.Context, id string) (*domain.RevisionCase, error) {
-	result := make(chan caseReadResult)
+	result := make(chan caseReadResult, 1)
 	go func() {
-		item, err := s.repo.Get(context.WithoutCancel(ctx), id)
+		item, err := s.repo.Get(ctx, id)
 		result <- caseReadResult{item: item, err: err}
 	}()
-	outcome := <-result
-	if outcome.err != nil {
-		return nil, Translate(outcome.err)
+	select {
+	case <-ctx.Done():
+		return nil, Translate(ctx.Err())
+	case outcome := <-result:
+		if outcome.err != nil {
+			return nil, Translate(outcome.err)
+		}
+		return outcome.item, nil
 	}
-	return outcome.item, nil
 }
 func (s *Service) List(ctx context.Context) ([]*domain.RevisionCase, error) {
 	v, err := s.repo.List(ctx)

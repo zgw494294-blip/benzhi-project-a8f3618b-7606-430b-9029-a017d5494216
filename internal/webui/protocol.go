@@ -43,6 +43,10 @@ func writeError(w http.ResponseWriter, err error) {
 		status = http.StatusBadRequest
 	case "invalid_state", "checks_failed", "open_findings", "remediation_unverified", "batch_not_reviewable":
 		status = http.StatusConflict
+	case "request_canceled":
+		status = 499
+	case "request_timeout":
+		status = http.StatusGatewayTimeout
 	}
 	writeJSON(w, status, envelope{Error: appErr})
 }
