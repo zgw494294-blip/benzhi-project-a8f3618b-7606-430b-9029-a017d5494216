@@ -54,6 +54,7 @@ func (s *Service) CreateCase(ctx context.Context, cmd CreateCaseCommand) (*domai
 	if err != nil {
 		return nil, false, Translate(err)
 	}
+	s.invalidateListCache()
 	return out, replayed, nil
 }
 func (s *Service) mutate(ctx context.Context, id string, meta Meta, action string, fn Mutation) (*domain.RevisionCase, bool, error) {
@@ -76,6 +77,7 @@ func (s *Service) mutateDetailed(ctx context.Context, id string, meta Meta, acti
 	if err != nil {
 		return nil, false, Translate(err)
 	}
+	s.invalidateListCache()
 	return out, replayed, nil
 }
 func (s *Service) Get(ctx context.Context, id string) (*domain.RevisionCase, error) {
@@ -84,6 +86,11 @@ func (s *Service) Get(ctx context.Context, id string) (*domain.RevisionCase, err
 		return nil, Translate(err)
 	}
 	return v, nil
+}
+func (s *Service) invalidateListCache() {
+	s.listCacheMu.Lock()
+	s.listCacheJSON = nil
+	s.listCacheMu.Unlock()
 }
 func (s *Service) List(ctx context.Context) ([]*domain.RevisionCase, error) {
 	s.listCacheMu.RLock()
