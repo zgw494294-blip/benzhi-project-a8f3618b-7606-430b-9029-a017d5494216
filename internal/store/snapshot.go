@@ -17,11 +17,6 @@ func projectionDigest(p projection) string {
 	return hex.EncodeToString(sum[:])
 }
 func (s *FileStore) commit(key string, item *domain.RevisionCase, audit domain.AuditEvent) error {
-	info, err := s.log.Stat()
-	if err != nil {
-		return err
-	}
-	oldSize := info.Size()
 	idem := idemResult{CaseID: item.ID, Version: item.Version, Result: item}
 	payload := committedPayload{Case: item, Audit: audit, Idempotency: idem}
 	frame, err := s.appendFrame(key, payload)
@@ -38,9 +33,6 @@ func (s *FileStore) commit(key string, item *domain.RevisionCase, audit domain.A
 	next.Audits[item.ID] = append(next.Audits[item.ID], audit)
 	next.Idempotency[key] = idem
 	if err = s.writeSnapshot(next); err != nil {
-		_ = s.log.Truncate(oldSize)
-		_, _ = s.log.Seek(0, 2)
-		_ = s.log.Sync()
 		return fmt.Errorf("写入投影快照失败: %w", err)
 	}
 	s.state = next
