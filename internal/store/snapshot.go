@@ -106,9 +106,10 @@ func (s *FileStore) writeSnapshot(p projection) error {
 	return nil
 }
 func (s *FileStore) recover() error {
-	existingSnapshot, err := readProjection(s.snapshotPath)
-	if err != nil {
-		return err
+	existingSnapshot, snapshotErr := readProjection(s.snapshotPath)
+	if snapshotErr != nil {
+		// 投影仅用于加速启动；事件日志仍可用时，恢复流程会在校验日志后重建投影。
+		existingSnapshot = nil
 	}
 	frames, err := readFrames(s.logPath)
 	if err != nil {
@@ -148,6 +149,14 @@ func (s *FileStore) recover() error {
 		}
 		if existingSnapshot.LastSequence == state.LastSequence && existingSnapshot.LastDigest != state.LastDigest {
 			return fmt.Errorf("投影快照与事件日志摘要不一致")
+		}
+	}
+	if snapshotErr != nil {
+		if state.LastSequence == 0 {
+			return snapshotErr
+		}
+		if err = s.writeSnapshot(state); err != nil {
+			return fmt.Errorf("从事件日志重建投影失败: %w", err)
 		}
 	}
 	return nil
