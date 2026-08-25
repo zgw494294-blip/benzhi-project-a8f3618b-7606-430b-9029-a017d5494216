@@ -10,15 +10,20 @@ import (
 )
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo         Repository
+	now          func() time.Time
+	noticeLookup map[string]string
 }
 
 func NewService(repo Repository) *Service {
-	return &Service{repo: repo, now: func() time.Time { return time.Now().UTC().Truncate(time.Second) }}
+	return &Service{
+		repo:         repo,
+		now:          func() time.Time { return time.Now().UTC().Truncate(time.Second) },
+		noticeLookup: map[string]string{},
+	}
 }
 func NewServiceWithClock(repo Repository, now func() time.Time) *Service {
-	return &Service{repo: repo, now: now}
+	return &Service{repo: repo, now: now, noticeLookup: map[string]string{}}
 }
 func newID(prefix string) string {
 	raw := make([]byte, 8)

@@ -92,6 +92,14 @@ func (s *Service) SearchNotices(ctx context.Context, query NoticeQuery) (*Notice
 }
 
 func (s *Service) VerifyEffectivityNotice(ctx context.Context, noticeID, code string) (*NoticeVerificationView, error) {
+	if caseID, ok := s.noticeLookup[noticeID]; ok {
+		c, err := s.Get(ctx, caseID)
+		if err != nil {
+			return nil, err
+		}
+		verification := domain.VerifyNoticeAt(c, code, s.now())
+		return &NoticeVerificationView{Item: noticeItem(c), Verification: verification, FieldUsable: verification.Matched && verification.Status == domain.NoticeCurrent}, nil
+	}
 	cases, err := s.List(ctx)
 	if err != nil {
 		return nil, err
@@ -100,6 +108,8 @@ func (s *Service) VerifyEffectivityNotice(ctx context.Context, noticeID, code st
 		if c.Status != domain.StatusEffective || c.Notice == nil {
 			continue
 		}
+		s.noticeLookup[c.Notice.ID] = c.ID
+		s.noticeLookup[c.Notice.SerialNumber] = c.ID
 		if c.Notice.ID != noticeID && c.Notice.SerialNumber != noticeID {
 			continue
 		}
