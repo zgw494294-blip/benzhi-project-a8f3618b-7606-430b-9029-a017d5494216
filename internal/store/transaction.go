@@ -28,7 +28,28 @@ func (s *FileStore) Create(_ context.Context, key string, item *domain.RevisionC
 	out, _ := cloneCase(copyItem)
 	return out, false, nil
 }
-func (s *FileStore) Update(_ context.Context, id string, expected int64, key, action, actor string, mutate application.Mutation, details ...string) (*domain.RevisionCase, bool, error) {
+
+type updateResult struct {
+	item     *domain.RevisionCase
+	replayed bool
+	err      error
+}
+
+func (s *FileStore) Update(ctx context.Context, id string, expected int64, key, action, actor string, mutate application.Mutation, details ...string) (*domain.RevisionCase, bool, error) {
+	result := make(chan updateResult, 1)
+	go func() {
+		item, replayed, err := s.update(id, expected, key, action, actor, mutate, details...)
+		result <- updateResult{item: item, replayed: replayed, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	case completed := <-result:
+		return completed.item, completed.replayed, completed.err
+	}
+}
+
+func (s *FileStore) update(id string, expected int64, key, action, actor string, mutate application.Mutation, details ...string) (*domain.RevisionCase, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if prior, ok := s.state.Idempotency[key]; ok {
