@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RevisionGate 临时修订工作台</title><link rel="stylesheet" href="/static/app.css"></head>
+<body>
+<header><div><span class="eyebrow">AIRWORTHINESS DOCUMENT CONTROL</span><h1>RevisionGate</h1><p>维修手册临时修订 · 技术校核与车间生效</p></div><div id="health" class="health">服务连接中</div></header>
+<main>
+<aside><button id="new-case" class="primary">＋ 新建临时修订</button><h2>修订任务</h2><div id="case-list" class="case-list"><p class="muted">暂无任务</p></div><h2>生效通知检索</h2><form id="notice-search"><input name="manualNumber" placeholder="手册编号"><input name="aircraftModel" placeholder="机型"><input name="configuration" placeholder="构型"><input name="verificationCode" placeholder="校验码"><button>检索通知</button></form><div id="notice-results" class="case-list muted">输入条件检索已生效通知</div></aside>
+<section class="workspace">
+<div id="empty" class="empty"><h2>选择或创建修订任务</h2><p>完整完成条款编制、依据校核、问题整改、批准冻结和生效通知签发。</p></div>
+<div id="detail" hidden>
+<div class="title-row"><div><span id="case-number" class="mono"></span><h2 id="case-title"></h2></div><span id="status" class="status"></span></div>
+<div id="steps" class="steps"></div><div id="flash" role="status" aria-live="polite"></div>
+<div class="grid"><article><h3>任务资料</h3><div id="meta"></div></article><article><div class="article-head"><h3>自动校核与送审就绪</h3><div><button id="show-all-checks">全部</button><button id="show-failed-checks">仅失败</button></div></div><div id="readiness"></div><div id="checks"></div><button data-action="validate">重新校核</button></article></div>
+<article><div class="article-head"><div><h3>有序变更块</h3><small id="sort-hint" class="muted"></small></div><div><button id="retry-order" hidden>刷新后重试排序</button><button data-open="change" data-requires="add_change">添加变更块</button></div></div><div id="blocks"></div></article>
+<article><div class="article-head"><h3>技术审查与整改</h3><button data-open="finding" data-requires="add_finding">登记问题</button></div><div id="findings"></div><section id="review-panel" hidden><h4>当前整改轮复核队列</h4><div id="review-queue"></div><label for="batch-reviewer">复核人</label><input id="batch-reviewer"><button id="batch-review" data-requires="batch_review_findings">提交批量结论</button></section></article>
+<article id="notice-card" hidden><h3>车间生效通知</h3><div id="notice"></div></article>
+<div class="actions"><button data-action="submit">提交技术审查</button><button data-action="start_remediation">开始整改轮次</button><button data-action="request_approval">提交负责人批准</button><button data-action="approve" class="primary">批准并签发通知</button></div>
+</div></section></main>
+<dialog id="editor"><form method="dialog" id="editor-form"><h2 id="form-title">录入</h2><div id="form-fields"></div><div class="dialog-actions"><button type="button" id="refresh-editor">刷新任务版本</button><button type="button" id="cancel-editor">取消</button><button id="save" value="default" class="primary">保存</button></div></form></dialog>
+<footer>所有写入均使用 expectedVersion 与 idempotencyKey，并记录不可删改的审计轨迹。</footer><script src="/static/app.js"></script>
+</body></html>
