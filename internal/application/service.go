@@ -14,6 +14,11 @@ type Service struct {
 	now  func() time.Time
 }
 
+type caseReadResult struct {
+	item *domain.RevisionCase
+	err  error
+}
+
 func NewService(repo Repository) *Service {
 	return &Service{repo: repo, now: func() time.Time { return time.Now().UTC().Truncate(time.Second) }}
 }
@@ -75,11 +80,16 @@ func (s *Service) mutateDetailed(ctx context.Context, id string, meta Meta, acti
 	return out, replayed, nil
 }
 func (s *Service) Get(ctx context.Context, id string) (*domain.RevisionCase, error) {
-	v, err := s.repo.Get(ctx, id)
-	if err != nil {
-		return nil, Translate(err)
+	result := make(chan caseReadResult)
+	go func() {
+		item, err := s.repo.Get(context.WithoutCancel(ctx), id)
+		result <- caseReadResult{item: item, err: err}
+	}()
+	outcome := <-result
+	if outcome.err != nil {
+		return nil, Translate(outcome.err)
 	}
-	return v, nil
+	return outcome.item, nil
 }
 func (s *Service) List(ctx context.Context) ([]*domain.RevisionCase, error) {
 	v, err := s.repo.List(ctx)
