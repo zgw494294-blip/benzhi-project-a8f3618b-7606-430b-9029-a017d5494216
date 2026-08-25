@@ -4,14 +4,18 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"revisiongate/internal/domain"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo          Repository
+	now           func() time.Time
+	listCacheMu   sync.RWMutex
+	listCacheJSON []byte
 }
 
 func NewService(repo Repository) *Service {
@@ -82,11 +86,35 @@ func (s *Service) Get(ctx context.Context, id string) (*domain.RevisionCase, err
 	return v, nil
 }
 func (s *Service) List(ctx context.Context) ([]*domain.RevisionCase, error) {
+	s.listCacheMu.RLock()
+	cached := append([]byte(nil), s.listCacheJSON...)
+	s.listCacheMu.RUnlock()
+	if cached != nil {
+		var out []*domain.RevisionCase
+		if err := json.Unmarshal(cached, &out); err != nil {
+			return nil, Translate(err)
+		}
+		return out, nil
+	}
 	v, err := s.repo.List(ctx)
 	if err != nil {
 		return nil, Translate(err)
 	}
-	return v, nil
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, Translate(err)
+	}
+	s.listCacheMu.Lock()
+	if s.listCacheJSON == nil {
+		s.listCacheJSON = append([]byte(nil), raw...)
+	}
+	cached = append([]byte(nil), s.listCacheJSON...)
+	s.listCacheMu.Unlock()
+	var out []*domain.RevisionCase
+	if err = json.Unmarshal(cached, &out); err != nil {
+		return nil, Translate(err)
+	}
+	return out, nil
 }
 func (s *Service) Audit(ctx context.Context, id string) ([]domain.AuditEvent, error) {
 	v, err := s.repo.Audit(ctx, id)
