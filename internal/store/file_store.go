@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -50,14 +49,7 @@ func (s *FileStore) Close() error {
 	return err
 }
 func cloneCase(c *domain.RevisionCase) (*domain.RevisionCase, error) {
-	raw, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-	var out domain.RevisionCase
-	if err = json.Unmarshal(raw, &out); err != nil {
-		return nil, err
-	}
+	out := *c
 	return &out, nil
 }
 func (s *FileStore) Get(_ context.Context, id string) (*domain.RevisionCase, error) {
